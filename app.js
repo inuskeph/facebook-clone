@@ -5,6 +5,17 @@
 const SUPABASE_URL = 'YOUR_SUPABASE_URL';
 const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
+// Check if Supabase SDK loaded and credentials are set
+if (!window.supabase) {
+  document.getElementById('app').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;padding:20px;text-align:center"><div><h1 style="color:#1877f2;margin-bottom:16px">Facebook Clone</h1><p style="font-size:18px;color:#65676b;margin-bottom:16px">Supabase SDK failed to load.</p><p>Make sure you are running this from a local server (not file://)<br><code style="background:#f0f2f5;padding:4px 8px;border-radius:4px">python3 -m http.server 3000</code></p></div></div>';
+  throw new Error('Supabase SDK not loaded');
+}
+
+if (SUPABASE_URL === 'YOUR_SUPABASE_URL' || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY') {
+  document.getElementById('app').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;padding:20px;text-align:center"><div><h1 style="color:#1877f2;margin-bottom:16px">Facebook Clone</h1><p style="font-size:18px;color:#65676b;margin-bottom:16px">Please configure your Supabase credentials!</p><p style="margin-bottom:12px">Open <code style="background:#f0f2f5;padding:4px 8px;border-radius:4px">app.js</code> and replace:</p><pre style="background:#f0f2f5;padding:16px;border-radius:8px;text-align:left;display:inline-block;font-size:14px">const SUPABASE_URL = \'https://your-project.supabase.co\';\nconst SUPABASE_ANON_KEY = \'your-anon-key\';</pre><p style="margin-top:16px;color:#65676b">Find these in Supabase Dashboard → Settings → API</p></div></div>';
+  throw new Error('Supabase not configured');
+}
+
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let state = { user: null, profile: null, currentPage: 'feed', pageParams: {} };
