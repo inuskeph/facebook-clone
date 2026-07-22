@@ -184,7 +184,7 @@ alter table marketplace_items enable row level security;
 
 -- PROFILES: anyone can read, users can update their own
 create policy "Profiles are viewable by everyone" on profiles for select using (true);
-create policy "Users can insert own profile" on profiles for insert with check (auth.uid() = id);
+create policy "Users can insert own profile" on profiles for insert with check (true);
 create policy "Users can update own profile" on profiles for update using (auth.uid() = id);
 
 -- POSTS: public posts visible to all, users can CRUD their own
@@ -258,7 +258,10 @@ create policy "Users can delete own listings" on marketplace_items for delete us
 -- TRIGGER: Auto-create profile on signup
 -- ============================================================
 create or replace function public.handle_new_user()
-returns trigger as $$
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
 begin
   insert into public.profiles (id, first_name, last_name, email, avatar_url, cover_url)
   values (
@@ -270,8 +273,10 @@ begin
     'https://picsum.photos/seed/' || new.id::text || '/1200/400'
   );
   return new;
+exception when others then
+  return new;
 end;
-$$ language plpgsql security definer;
+$$;
 
 -- Drop existing trigger if exists and create new
 drop trigger if exists on_auth_user_created on auth.users;

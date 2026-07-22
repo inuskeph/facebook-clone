@@ -132,11 +132,17 @@ async function handleRegister(e) {
   const f = e.target;
   const { data, error } = await db.auth.signUp({ email: f.email.value, password: f.password.value, options: { data: { first_name: f.firstName.value, last_name: f.lastName.value } } });
   if (error) { document.getElementById('authError').textContent = error.message; return; }
-  // Create profile
-  if (data.user) {
-    await db.from('profiles').insert({ id: data.user.id, first_name: f.firstName.value, last_name: f.lastName.value, email: f.email.value, avatar_url: `https://i.pravatar.cc/150?img=${Math.floor(Math.random()*70)}`, cover_url: `https://picsum.photos/seed/${Date.now()}/1200/400` });
+  if (data.user && data.session) {
+    // User signed up and auto-confirmed - trigger creates profile
     state.user = data.user;
+    // Wait a moment for trigger to create profile
+    await new Promise(r => setTimeout(r, 1000));
     await loadUserProfile();
+    // If trigger didn't create profile, create it manually
+    if (!state.profile) {
+      await db.from('profiles').upsert({ id: data.user.id, first_name: f.firstName.value, last_name: f.lastName.value, email: f.email.value, avatar_url: `https://i.pravatar.cc/150?img=${Math.floor(Math.random()*70)}`, cover_url: `https://picsum.photos/seed/${Date.now()}/1200/400` });
+      await loadUserProfile();
+    }
     navigate('feed');
   } else {
     document.getElementById('authError').textContent = 'Check your email to confirm your account!';
