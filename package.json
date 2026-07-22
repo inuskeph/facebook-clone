@@ -1,0 +1,12 @@
+{
+  "name": "facebook-clone",
+  "version": "1.0.0",
+  "description": "Full-featured Facebook clone with Node.js - zero dependencies",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js"
+  },
+  "keywords": ["facebook", "clone", "social-network", "nodejs"],
+  "license": "MIT"
+}
