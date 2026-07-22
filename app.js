@@ -318,7 +318,7 @@ function renderPostCard(post) {
 
 // ===== POST ACTIONS =====
 async function likePost(postId) {
-  const { data: existing } = await db.from('likes').select('id').eq('post_id', postId).eq('user_id', state.user.id).single();
+  const { data: existing } = await db.from('likes').select('id').eq('post_id', postId).eq('user_id', state.user.id).maybeSingle();
   if (existing) {
     await db.from('likes').delete().eq('id', existing.id);
   } else {
@@ -598,7 +598,7 @@ async function loadPages() {
 }
 
 async function likePage(id) {
-  const { data: existing } = await db.from('page_likes').select('id').eq('page_id', id).eq('user_id', state.user.id).single();
+  const { data: existing } = await db.from('page_likes').select('id').eq('page_id', id).eq('user_id', state.user.id).maybeSingle();
   if (existing) await db.from('page_likes').delete().eq('id', existing.id);
   else await db.from('page_likes').insert({ page_id: id, user_id: state.user.id });
   loadPages();
