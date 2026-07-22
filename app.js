@@ -16,7 +16,7 @@ if (SUPABASE_URL === 'YOUR_SUPABASE_URL' || SUPABASE_ANON_KEY === 'YOUR_SUPABASE
   throw new Error('Supabase not configured');
 }
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let state = { user: null, profile: null, currentPage: 'feed', pageParams: {} };
 
@@ -106,7 +106,7 @@ function renderAuth() {
 async function handleLogin(e) {
   e.preventDefault();
   const form = e.target;
-  const { data, error } = await supabase.auth.signInWithPassword({ email: form.email.value, password: form.password.value });
+  const { data, error } = await db.auth.signInWithPassword({ email: form.email.value, password: form.password.value });
   if (error) { document.getElementById('authError').textContent = error.message; return; }
   state.user = data.user;
   await loadUserProfile();
@@ -130,11 +130,11 @@ function showRegisterForm() {
 async function handleRegister(e) {
   e.preventDefault();
   const f = e.target;
-  const { data, error } = await supabase.auth.signUp({ email: f.email.value, password: f.password.value, options: { data: { first_name: f.firstName.value, last_name: f.lastName.value } } });
+  const { data, error } = await db.auth.signUp({ email: f.email.value, password: f.password.value, options: { data: { first_name: f.firstName.value, last_name: f.lastName.value } } });
   if (error) { document.getElementById('authError').textContent = error.message; return; }
   // Create profile
   if (data.user) {
-    await supabase.from('profiles').insert({ id: data.user.id, first_name: f.firstName.value, last_name: f.lastName.value, email: f.email.value, avatar_url: `https://i.pravatar.cc/150?img=${Math.floor(Math.random()*70)}`, cover_url: `https://picsum.photos/seed/${Date.now()}/1200/400` });
+    await db.from('profiles').insert({ id: data.user.id, first_name: f.firstName.value, last_name: f.lastName.value, email: f.email.value, avatar_url: `https://i.pravatar.cc/150?img=${Math.floor(Math.random()*70)}`, cover_url: `https://picsum.photos/seed/${Date.now()}/1200/400` });
     state.user = data.user;
     await loadUserProfile();
     navigate('feed');
@@ -146,12 +146,12 @@ async function handleRegister(e) {
 
 async function loadUserProfile() {
   if (!state.user) return;
-  const { data } = await supabase.from('profiles').select('*').eq('id', state.user.id).single();
+  const { data } = await db.from('profiles').select('*').eq('id', state.user.id).single();
   state.profile = data;
 }
 
 async function logout() {
-  await supabase.auth.signOut();
+  await db.auth.signOut();
   state.user = null; state.profile = null;
   render();
 }
@@ -181,7 +181,7 @@ function renderHeader() {
 }
 
 async function loadNotifBadge() {
-  const { count } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', state.user.id).eq('read', false);
+  const { count } = await db.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', state.user.id).eq('read', false);
   const badge = document.getElementById('notifBadge');
   if (badge && count > 0) { badge.textContent = count; badge.style.display = 'flex'; }
 }
@@ -189,8 +189,8 @@ async function loadNotifBadge() {
 async function toggleNotifications() {
   const drop = document.getElementById('notifDrop');
   if (drop.style.display !== 'none') { drop.style.display = 'none'; return; }
-  const { data } = await supabase.from('notifications').select('*, from_user:profiles!notifications_from_user_id_fkey(id, first_name, last_name, avatar_url)').eq('user_id', state.user.id).order('created_at', { ascending: false }).limit(15);
-  await supabase.from('notifications').update({ read: true }).eq('user_id', state.user.id).eq('read', false);
+  const { data } = await db.from('notifications').select('*, from_user:profiles!notifications_from_user_id_fkey(id, first_name, last_name, avatar_url)').eq('user_id', state.user.id).order('created_at', { ascending: false }).limit(15);
+  await db.from('notifications').update({ read: true }).eq('user_id', state.user.id).eq('read', false);
   document.getElementById('notifBadge').style.display = 'none';
   drop.innerHTML = `<h3>Notifications</h3>${!data?.length ? '<p style="padding:16px;text-align:center;color:var(--text2)">No notifications</p>' : data.map(n => `
     <div class="notif-item ${n.read?'':'unread'}">
@@ -243,7 +243,7 @@ function renderFeed() {
 
 async function loadFeed() {
   // Load posts with author profiles, likes count
-  const { data: posts } = await supabase.from('posts').select('*, author:profiles!posts_user_id_fkey(id, first_name, last_name, avatar_url), comments(id), likes(user_id)').order('created_at', { ascending: false }).limit(20);
+  const { data: posts } = await db.from('posts').select('*, author:profiles!posts_user_id_fkey(id, first_name, last_name, avatar_url), comments(id), likes(user_id)').order('created_at', { ascending: false }).limit(20);
 
   if (posts) {
     const html = posts.map(post => renderPostCard({ ...post, likesCount: post.likes?.length || 0, commentsCount: post.comments?.length || 0, isLiked: post.likes?.some(l => l.user_id === state.user.id) })).join('');
@@ -251,7 +251,7 @@ async function loadFeed() {
   }
 
   // Load stories
-  const { data: stories } = await supabase.from('stories').select('*, author:profiles!stories_user_id_fkey(id, first_name, last_name, avatar_url)').gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false });
+  const { data: stories } = await db.from('stories').select('*, author:profiles!stories_user_id_fkey(id, first_name, last_name, avatar_url)').gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false });
   if (stories) {
     const groups = {};
     stories.forEach(s => { if (!groups[s.user_id]) groups[s.user_id] = { user: s.author, stories: [] }; groups[s.user_id].stories.push(s); });
@@ -259,7 +259,7 @@ async function loadFeed() {
   }
 
   // Load friends for contacts
-  const { data: friendships } = await supabase.from('friends').select('*, friend:profiles!friends_friend_id_fkey(id, first_name, last_name, avatar_url)').eq('user_id', state.user.id).eq('status', 'accepted');
+  const { data: friendships } = await db.from('friends').select('*, friend:profiles!friends_friend_id_fkey(id, first_name, last_name, avatar_url)').eq('user_id', state.user.id).eq('status', 'accepted');
   if (friendships) {
     document.getElementById('contactsList').innerHTML = `<h4>Contacts</h4>${friendships.map(f => `
       <div class="contact" onclick="navigate('profile',{userId:'${f.friend.id}'})">
@@ -312,14 +312,14 @@ function renderPostCard(post) {
 
 // ===== POST ACTIONS =====
 async function likePost(postId) {
-  const { data: existing } = await supabase.from('likes').select('id').eq('post_id', postId).eq('user_id', state.user.id).single();
+  const { data: existing } = await db.from('likes').select('id').eq('post_id', postId).eq('user_id', state.user.id).single();
   if (existing) {
-    await supabase.from('likes').delete().eq('id', existing.id);
+    await db.from('likes').delete().eq('id', existing.id);
   } else {
-    await supabase.from('likes').insert({ post_id: postId, user_id: state.user.id });
+    await db.from('likes').insert({ post_id: postId, user_id: state.user.id });
   }
   // Refresh counts
-  const { count } = await supabase.from('likes').select('*', { count: 'exact', head: true }).eq('post_id', postId);
+  const { count } = await db.from('likes').select('*', { count: 'exact', head: true }).eq('post_id', postId);
   const btn = document.querySelector(`#post-${postId} .post-btn`);
   if (btn) btn.className = `post-btn ${existing ? '' : 'liked'}`;
   const stats = document.querySelector(`#post-${postId} .likes-info`);
@@ -330,7 +330,7 @@ async function toggleComments(postId) {
   const el = document.getElementById(`comments-${postId}`);
   if (el.style.display === 'none') {
     el.style.display = 'block';
-    const { data } = await supabase.from('comments').select('*, author:profiles!comments_user_id_fkey(id, first_name, last_name, avatar_url)').eq('post_id', postId).order('created_at');
+    const { data } = await db.from('comments').select('*, author:profiles!comments_user_id_fkey(id, first_name, last_name, avatar_url)').eq('post_id', postId).order('created_at');
     document.getElementById(`commentsList-${postId}`).innerHTML = (data||[]).map(c => `
       <div class="comment"><img src="${avatar(c.author?.avatar_url)}"><div><div class="comment-bubble"><h5>${c.author?.first_name} ${c.author?.last_name}</h5><p>${escapeHtml(c.content)}</p></div><div class="comment-meta"><span>${timeAgo(c.created_at)}</span></div></div></div>`).join('');
   } else { el.style.display = 'none'; }
@@ -338,7 +338,7 @@ async function toggleComments(postId) {
 
 async function submitComment(postId, input) {
   if (!input.value.trim()) return;
-  await supabase.from('comments').insert({ post_id: postId, user_id: state.user.id, content: input.value.trim() });
+  await db.from('comments').insert({ post_id: postId, user_id: state.user.id, content: input.value.trim() });
   input.value = '';
   // Refresh
   const el = document.getElementById(`comments-${postId}`);
@@ -350,7 +350,7 @@ async function sharePost(postId) { alert('Post shared to your timeline!'); }
 
 async function deletePost(postId) {
   if (!confirm('Delete this post?')) return;
-  await supabase.from('posts').delete().eq('id', postId).eq('user_id', state.user.id);
+  await db.from('posts').delete().eq('id', postId).eq('user_id', state.user.id);
   document.getElementById(`post-${postId}`)?.remove();
 }
 
@@ -381,7 +381,7 @@ function openCreatePost() {
 async function submitPost() {
   const content = document.getElementById('postContent').value;
   if (!content.trim()) return;
-  await supabase.from('posts').insert({ user_id: state.user.id, content, privacy: document.getElementById('postPrivacy').value, feeling: document.getElementById('postFeeling').value, location: document.getElementById('postLocation').value });
+  await db.from('posts').insert({ user_id: state.user.id, content, privacy: document.getElementById('postPrivacy').value, feeling: document.getElementById('postFeeling').value, location: document.getElementById('postLocation').value });
   document.querySelector('.modal-overlay').remove();
   loadFeed();
 }
@@ -408,7 +408,7 @@ function openCreateStory() {
 async function submitStory() {
   const text = document.getElementById('storyText').value;
   if (!text.trim()) return;
-  await supabase.from('stories').insert({ user_id: state.user.id, type: 'text', content: text, bg_color: window._storyBg, expires_at: new Date(Date.now() + 86400000).toISOString() });
+  await db.from('stories').insert({ user_id: state.user.id, type: 'text', content: text, bg_color: window._storyBg, expires_at: new Date(Date.now() + 86400000).toISOString() });
   document.querySelector('.modal-overlay').remove();
   loadFeed();
 }
@@ -419,10 +419,10 @@ function renderProfile() { return `<div class="profile-page" id="profileContaine
 
 async function loadProfile() {
   const userId = state.pageParams?.userId || state.user.id;
-  const { data: profile } = await supabase.from('profiles').select('*').eq('id', userId).single();
+  const { data: profile } = await db.from('profiles').select('*').eq('id', userId).single();
   if (!profile) { document.getElementById('profileContainer').innerHTML = '<div class="loading">User not found</div>'; return; }
-  const { data: posts } = await supabase.from('posts').select('*, author:profiles!posts_user_id_fkey(id, first_name, last_name, avatar_url), comments(id), likes(user_id)').eq('user_id', userId).order('created_at', { ascending: false });
-  const { data: friendships } = await supabase.from('friends').select('*, friend:profiles!friends_friend_id_fkey(id, first_name, last_name, avatar_url)').eq('user_id', userId).eq('status', 'accepted');
+  const { data: posts } = await db.from('posts').select('*, author:profiles!posts_user_id_fkey(id, first_name, last_name, avatar_url), comments(id), likes(user_id)').eq('user_id', userId).order('created_at', { ascending: false });
+  const { data: friendships } = await db.from('friends').select('*, friend:profiles!friends_friend_id_fkey(id, first_name, last_name, avatar_url)').eq('user_id', userId).eq('status', 'accepted');
   const friends = friendships || [];
   const isOwner = userId === state.user.id;
 
@@ -480,7 +480,7 @@ function openEditProfile() {
 }
 
 async function saveProfile() {
-  await supabase.from('profiles').update({ bio: document.getElementById('editBio').value, location: document.getElementById('editLocation').value, workplace: document.getElementById('editWorkplace').value, education: document.getElementById('editEducation').value }).eq('id', state.user.id);
+  await db.from('profiles').update({ bio: document.getElementById('editBio').value, location: document.getElementById('editLocation').value, workplace: document.getElementById('editWorkplace').value, education: document.getElementById('editEducation').value }).eq('id', state.user.id);
   document.querySelector('.modal-overlay').remove();
   await loadUserProfile();
   loadProfile();
@@ -499,29 +499,29 @@ async function loadFriendsTab(tab, btn) {
   if (btn) { document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); btn.classList.add('active'); }
   const el = document.getElementById('friendsContent');
   if (tab === 'requests') {
-    const { data } = await supabase.from('friends').select('*, from:profiles!friends_user_id_fkey(id, first_name, last_name, avatar_url)').eq('friend_id', state.user.id).eq('status', 'pending');
+    const { data } = await db.from('friends').select('*, from:profiles!friends_user_id_fkey(id, first_name, last_name, avatar_url)').eq('friend_id', state.user.id).eq('status', 'pending');
     el.innerHTML = !data?.length ? '<div class="loading">No pending requests</div>' : `<div class="grid">${data.map(r => `<div class="card"><img class="card-img" src="${avatar(r.from?.avatar_url)}"><div class="card-body"><h4>${r.from?.first_name} ${r.from?.last_name}</h4><div class="card-actions"><button class="btn btn-primary" onclick="acceptFriend('${r.id}')">Confirm</button><button class="btn btn-secondary" onclick="declineFriend('${r.id}')">Delete</button></div></div></div>`).join('')}</div>`;
   } else if (tab === 'suggestions') {
-    const { data: friends } = await supabase.from('friends').select('friend_id').eq('user_id', state.user.id);
+    const { data: friends } = await db.from('friends').select('friend_id').eq('user_id', state.user.id);
     const friendIds = (friends||[]).map(f => f.friend_id);
     friendIds.push(state.user.id);
-    const { data } = await supabase.from('profiles').select('*').not('id', 'in', `(${friendIds.join(',')})`).limit(10);
+    const { data } = await db.from('profiles').select('*').not('id', 'in', `(${friendIds.join(',')})`).limit(10);
     el.innerHTML = `<div class="grid">${(data||[]).map(p => `<div class="card"><img class="card-img" src="${avatar(p.avatar_url)}"><div class="card-body"><h4>${p.first_name} ${p.last_name}</h4><p>${p.location||''}</p><div class="card-actions"><button class="btn btn-primary" onclick="sendFriendReq('${p.id}',this)">Add Friend</button></div></div></div>`).join('')}</div>`;
   } else {
-    const { data } = await supabase.from('friends').select('*, friend:profiles!friends_friend_id_fkey(id, first_name, last_name, avatar_url, location)').eq('user_id', state.user.id).eq('status', 'accepted');
+    const { data } = await db.from('friends').select('*, friend:profiles!friends_friend_id_fkey(id, first_name, last_name, avatar_url, location)').eq('user_id', state.user.id).eq('status', 'accepted');
     el.innerHTML = `<div class="grid">${(data||[]).map(f => `<div class="card" onclick="navigate('profile',{userId:'${f.friend.id}'})"><img class="card-img" src="${avatar(f.friend.avatar_url)}"><div class="card-body"><h4>${f.friend.first_name} ${f.friend.last_name}</h4><p>${f.friend.location||''}</p></div></div>`).join('')}</div>`;
   }
 }
 
-async function acceptFriend(id) { await supabase.from('friends').update({ status: 'accepted' }).eq('id', id); loadFriendsTab('requests'); }
-async function declineFriend(id) { await supabase.from('friends').delete().eq('id', id); loadFriendsTab('requests'); }
-async function sendFriendReq(userId, btn) { await supabase.from('friends').insert({ user_id: state.user.id, friend_id: userId, status: 'pending' }); if (btn) { btn.textContent = 'Request Sent'; btn.disabled = true; } }
+async function acceptFriend(id) { await db.from('friends').update({ status: 'accepted' }).eq('id', id); loadFriendsTab('requests'); }
+async function declineFriend(id) { await db.from('friends').delete().eq('id', id); loadFriendsTab('requests'); }
+async function sendFriendReq(userId, btn) { await db.from('friends').insert({ user_id: state.user.id, friend_id: userId, status: 'pending' }); if (btn) { btn.textContent = 'Request Sent'; btn.disabled = true; } }
 
 // ===== MESSENGER =====
 function renderMessenger() { return `<div class="messenger"><div class="msg-sidebar"><h2>Chats</h2><div id="convList"><div class="loading">Loading...</div></div></div><div class="msg-main" id="msgMain"><div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text2)">Select a conversation</div></div></div>`; }
 
 async function loadMessenger() {
-  const { data } = await supabase.from('conversations').select('*, participant1:profiles!conversations_user1_id_fkey(id, first_name, last_name, avatar_url), participant2:profiles!conversations_user2_id_fkey(id, first_name, last_name, avatar_url)').or(`user1_id.eq.${state.user.id},user2_id.eq.${state.user.id}`).order('updated_at', { ascending: false });
+  const { data } = await db.from('conversations').select('*, participant1:profiles!conversations_user1_id_fkey(id, first_name, last_name, avatar_url), participant2:profiles!conversations_user2_id_fkey(id, first_name, last_name, avatar_url)').or(`user1_id.eq.${state.user.id},user2_id.eq.${state.user.id}`).order('updated_at', { ascending: false });
   document.getElementById('convList').innerHTML = (data||[]).map(c => {
     const other = c.user1_id === state.user.id ? c.participant2 : c.participant1;
     return `<div class="conv-item" onclick="openConversation('${c.id}','${other?.id}')"><div class="conv-avatar"><img src="${avatar(other?.avatar_url)}"></div><div class="conv-info"><h4>${other?.first_name} ${other?.last_name}</h4><p>${c.last_message||'Start chatting'}</p></div><div class="conv-meta"><span class="time">${timeAgo(c.updated_at)}</span></div></div>`;
@@ -531,8 +531,8 @@ async function loadMessenger() {
 async function openConversation(convId, otherId) {
   window._activeConv = convId;
   document.querySelectorAll('.conv-item').forEach(el => el.classList.remove('active'));
-  const { data: messages } = await supabase.from('messages').select('*').eq('conversation_id', convId).order('created_at');
-  const { data: other } = await supabase.from('profiles').select('*').eq('id', otherId).single();
+  const { data: messages } = await db.from('messages').select('*').eq('conversation_id', convId).order('created_at');
+  const { data: other } = await db.from('profiles').select('*').eq('id', otherId).single();
   document.getElementById('msgMain').innerHTML = `
     <div class="msg-header"><img src="${avatar(other?.avatar_url)}"><div><h3>${other?.first_name} ${other?.last_name}</h3></div></div>
     <div class="msg-area" id="msgArea">${(messages||[]).map(m => `<div class="msg-row ${m.sender_id===state.user.id?'mine':'theirs'}"><div class="msg-bubble">${escapeHtml(m.content)}</div></div>`).join('')}</div>
@@ -544,8 +544,8 @@ async function sendMessage(e) {
   e.preventDefault();
   const input = document.getElementById('msgInput');
   if (!input.value.trim()) return;
-  await supabase.from('messages').insert({ conversation_id: window._activeConv, sender_id: state.user.id, content: input.value });
-  await supabase.from('conversations').update({ last_message: input.value, updated_at: new Date().toISOString() }).eq('id', window._activeConv);
+  await db.from('messages').insert({ conversation_id: window._activeConv, sender_id: state.user.id, content: input.value });
+  await db.from('conversations').update({ last_message: input.value, updated_at: new Date().toISOString() }).eq('id', window._activeConv);
   document.getElementById('msgArea').insertAdjacentHTML('beforeend', `<div class="msg-row mine"><div class="msg-bubble">${escapeHtml(input.value)}</div></div>`);
   input.value = '';
   document.getElementById('msgArea').scrollTop = 99999;
@@ -556,15 +556,15 @@ async function sendMessage(e) {
 function renderGroups() { return `<div class="page-container"><div class="section-header"><h2>Groups</h2><button class="btn btn-primary" onclick="openCreateGroup()">+ Create Group</button></div><div id="groupsContent"><div class="loading">Loading...</div></div></div>`; }
 
 async function loadGroups() {
-  const { data } = await supabase.from('groups').select('*, members:group_members(user_id)');
+  const { data } = await db.from('groups').select('*, members:group_members(user_id)');
   document.getElementById('groupsContent').innerHTML = `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr))">${(data||[]).map(g => {
     const isMember = g.members?.some(m => m.user_id === state.user.id);
     return `<div class="card"><div class="gc-cover" style="background-image:url(${g.cover_url||'https://picsum.photos/seed/g'+g.id+'/1200/400'})"></div><div class="gc-info"><h3>${escapeHtml(g.name)}</h3><p>${escapeHtml((g.description||'').substring(0,100))}</p><div class="gc-stats">${g.privacy==='public'?'🌍 Public':'🔒 Private'} · ${g.members?.length||0} members</div>${isMember?`<button class="btn btn-secondary" style="width:100%" onclick="leaveGroup('${g.id}')">Leave</button>`:`<button class="btn btn-primary" style="width:100%" onclick="joinGroup('${g.id}')">Join</button>`}</div></div>`;
   }).join('')}</div>`;
 }
 
-async function joinGroup(id) { await supabase.from('group_members').insert({ group_id: id, user_id: state.user.id }); loadGroups(); }
-async function leaveGroup(id) { await supabase.from('group_members').delete().eq('group_id', id).eq('user_id', state.user.id); loadGroups(); }
+async function joinGroup(id) { await db.from('group_members').insert({ group_id: id, user_id: state.user.id }); loadGroups(); }
+async function leaveGroup(id) { await db.from('group_members').delete().eq('group_id', id).eq('user_id', state.user.id); loadGroups(); }
 
 function openCreateGroup() {
   const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
@@ -575,8 +575,8 @@ function openCreateGroup() {
 
 async function submitGroup() {
   const name = document.getElementById('groupName').value; if (!name.trim()) return;
-  const { data } = await supabase.from('groups').insert({ name, description: document.getElementById('groupDesc').value, privacy: document.getElementById('groupPrivacy').value, created_by: state.user.id }).select().single();
-  if (data) await supabase.from('group_members').insert({ group_id: data.id, user_id: state.user.id, role: 'admin' });
+  const { data } = await db.from('groups').insert({ name, description: document.getElementById('groupDesc').value, privacy: document.getElementById('groupPrivacy').value, created_by: state.user.id }).select().single();
+  if (data) await db.from('group_members').insert({ group_id: data.id, user_id: state.user.id, role: 'admin' });
   document.querySelector('.modal-overlay').remove(); loadGroups();
 }
 
@@ -584,7 +584,7 @@ async function submitGroup() {
 function renderPages() { return `<div class="page-container"><div class="section-header"><h2>Pages</h2><button class="btn btn-primary" onclick="openCreatePage()">+ Create Page</button></div><div id="pagesContent"><div class="loading">Loading...</div></div></div>`; }
 
 async function loadPages() {
-  const { data } = await supabase.from('pages').select('*, followers:page_likes(user_id)');
+  const { data } = await db.from('pages').select('*, followers:page_likes(user_id)');
   document.getElementById('pagesContent').innerHTML = `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">${(data||[]).map(p => {
     const isLiked = p.followers?.some(f => f.user_id === state.user.id);
     return `<div class="card"><div class="pc-cover" style="background-image:url(${p.cover_url||'https://picsum.photos/seed/p'+p.id+'/1200/400'})"><img src="${avatar(p.avatar_url)}" class="pc-avatar"></div><div class="pc-info"><h3>${escapeHtml(p.name)}</h3><p class="cat">${escapeHtml(p.category||'')}</p><p class="stats">${p.followers?.length||0} likes</p><button class="btn ${isLiked?'btn-secondary':'btn-primary'}" style="width:100%" onclick="likePage('${p.id}')">${isLiked?'✓ Liked':'👍 Like'}</button></div></div>`;
@@ -592,9 +592,9 @@ async function loadPages() {
 }
 
 async function likePage(id) {
-  const { data: existing } = await supabase.from('page_likes').select('id').eq('page_id', id).eq('user_id', state.user.id).single();
-  if (existing) await supabase.from('page_likes').delete().eq('id', existing.id);
-  else await supabase.from('page_likes').insert({ page_id: id, user_id: state.user.id });
+  const { data: existing } = await db.from('page_likes').select('id').eq('page_id', id).eq('user_id', state.user.id).single();
+  if (existing) await db.from('page_likes').delete().eq('id', existing.id);
+  else await db.from('page_likes').insert({ page_id: id, user_id: state.user.id });
   loadPages();
 }
 
@@ -607,7 +607,7 @@ function openCreatePage() {
 
 async function submitPage() {
   const name = document.getElementById('pageName').value; if (!name.trim()) return;
-  await supabase.from('pages').insert({ name, category: document.getElementById('pageCat').value, description: document.getElementById('pageDesc').value, created_by: state.user.id });
+  await db.from('pages').insert({ name, category: document.getElementById('pageCat').value, description: document.getElementById('pageDesc').value, created_by: state.user.id });
   document.querySelector('.modal-overlay').remove(); loadPages();
 }
 
@@ -618,7 +618,7 @@ function renderMarketplace() { return `<div class="page-container"><div class="s
 async function loadMarketplace() { filterMarketplace(); }
 
 async function filterMarketplace() {
-  let query = supabase.from('marketplace_items').select('*, seller:profiles!marketplace_items_seller_id_fkey(id, first_name, last_name, avatar_url, location)').eq('status', 'available').order('created_at', { ascending: false });
+  let query = db.from('marketplace_items').select('*, seller:profiles!marketplace_items_seller_id_fkey(id, first_name, last_name, avatar_url, location)').eq('status', 'available').order('created_at', { ascending: false });
   const cat = document.getElementById('mpCategory')?.value;
   const search = document.getElementById('mpSearch')?.value;
   if (cat) query = query.eq('category', cat);
@@ -649,7 +649,7 @@ function openCreateListing() {
 
 async function submitListing() {
   const title = document.getElementById('itemTitle').value; if (!title.trim()) return;
-  await supabase.from('marketplace_items').insert({ seller_id: state.user.id, title, price: parseFloat(document.getElementById('itemPrice').value)||0, category: document.getElementById('itemCategory').value, condition: document.getElementById('itemCondition').value, location: document.getElementById('itemLocation').value, description: document.getElementById('itemDesc').value, status: 'available' });
+  await db.from('marketplace_items').insert({ seller_id: state.user.id, title, price: parseFloat(document.getElementById('itemPrice').value)||0, category: document.getElementById('itemCategory').value, condition: document.getElementById('itemCondition').value, location: document.getElementById('itemLocation').value, description: document.getElementById('itemDesc').value, status: 'available' });
   document.querySelector('.modal-overlay').remove(); filterMarketplace();
 }
 
@@ -665,15 +665,15 @@ async function searchTab(type, btn) {
   let html = '';
 
   if (type === 'all' || type === 'people') {
-    const { data } = await supabase.from('profiles').select('*').or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%`).limit(5);
+    const { data } = await db.from('profiles').select('*').or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%`).limit(5);
     if (data?.length) html += `<div class="search-section"><h3>People</h3>${data.map(u => `<div class="search-item" onclick="navigate('profile',{userId:'${u.id}'})"><img src="${avatar(u.avatar_url)}"><div class="si-info"><h4>${u.first_name} ${u.last_name}</h4><p>${u.location||'Facebook user'}</p></div></div>`).join('')}</div>`;
   }
   if (type === 'all' || type === 'posts') {
-    const { data } = await supabase.from('posts').select('*, author:profiles!posts_user_id_fkey(id, first_name, last_name, avatar_url)').ilike('content', `%${q}%`).limit(5);
+    const { data } = await db.from('posts').select('*, author:profiles!posts_user_id_fkey(id, first_name, last_name, avatar_url)').ilike('content', `%${q}%`).limit(5);
     if (data?.length) html += `<div class="search-section"><h3>Posts</h3>${data.map(p => `<div class="search-item" onclick="navigate('profile',{userId:'${p.author?.id}'})"><img src="${avatar(p.author?.avatar_url)}"><div class="si-info"><h4>${p.author?.first_name} ${p.author?.last_name}</h4><p>${escapeHtml(p.content?.substring(0,100))}</p></div></div>`).join('')}</div>`;
   }
   if (type === 'all' || type === 'groups') {
-    const { data } = await supabase.from('groups').select('*').ilike('name', `%${q}%`).limit(5);
+    const { data } = await db.from('groups').select('*').ilike('name', `%${q}%`).limit(5);
     if (data?.length) html += `<div class="search-section"><h3>Groups</h3>${data.map(g => `<div class="search-item" onclick="navigate('groups')"><img src="${g.cover_url||'https://picsum.photos/100/100'}" style="border-radius:8px"><div class="si-info"><h4>${escapeHtml(g.name)}</h4><p>${g.privacy} group</p></div></div>`).join('')}</div>`;
   }
 
@@ -682,7 +682,7 @@ async function searchTab(type, btn) {
 
 // ===== INIT =====
 async function init() {
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await db.auth.getSession();
   if (session) {
     state.user = session.user;
     await loadUserProfile();
@@ -691,7 +691,7 @@ async function init() {
   if (state.user) setTimeout(loadPageData, 100);
 
   // Listen for auth changes
-  supabase.auth.onAuthStateChange((event, session) => {
+  db.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') { state.user = null; state.profile = null; render(); }
   });
 }
