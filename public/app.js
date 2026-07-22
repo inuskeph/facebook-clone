@@ -36,7 +36,13 @@ function navigate(page, params = {}) {
 // ===== RENDER =====
 function render() {
   const app = document.getElementById('app');
-  if (!state.user) { app.innerHTML = renderAuth(); return; }
+  if (!state.user) {
+    app.innerHTML = renderAuth();
+    // Attach auth event listeners
+    document.getElementById('loginForm')?.addEventListener('submit', handleLogin);
+    document.getElementById('showRegister')?.addEventListener('click', showRegisterForm);
+    return;
+  }
   app.innerHTML = renderHeader() + `<div class="main">${renderPage()}</div>`;
   attachHeaderEvents();
   attachPageEvents();
