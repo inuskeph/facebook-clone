@@ -210,6 +210,7 @@ function renderFeed() {
 
 
 async function loadFeed() {
+  if (!state.user) return;
   try {
     const [feedData, stories, friends] = await Promise.all([
       api('/api/posts/feed'), api('/api/stories/feed'), api(`/api/users/${state.user.id}/friends`)
@@ -785,11 +786,14 @@ async function init() {
     }
   }
   render();
-  // Load page-specific data after render
-  setTimeout(loadPageData, 100);
+  // Load page-specific data after render only if logged in
+  if (state.user) {
+    setTimeout(loadPageData, 100);
+  }
 }
 
 function loadPageData() {
+  if (!state.user) return;
   switch(state.currentPage) {
     case 'feed': loadFeed(); break;
     case 'profile': loadProfile(); break;
@@ -808,7 +812,9 @@ navigate = function(page, params = {}) {
   state.currentPage = page;
   state.pageParams = params;
   render();
-  setTimeout(loadPageData, 50);
+  if (state.user) {
+    setTimeout(loadPageData, 50);
+  }
 };
 
 // Start the app
