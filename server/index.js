@@ -263,20 +263,20 @@ async function handleAPI(req, res, pathname, body) {
   }
 
   // Users
-  const userMatch = pathname.match(/^\/api\/users\/(.+)\/friends$/);
-  if (userMatch && method === 'GET') {
-    const u = db.users.find(x => x.id === userMatch[1]);
-    if (!u) return send(res, 404, { message: 'Not found' });
-    const friends = u.friends.map(fid => db.users.find(x => x.id === fid)).filter(Boolean).map(getUserSafe);
-    return send(res, 200, friends);
-  }
-
   if (pathname === '/api/users/suggestions/people' && method === 'GET') {
     const suggestions = db.users.filter(u => u.id !== userId && !currentUser.friends.includes(u.id)).map(u => {
       const mutual = u.friends.filter(f => currentUser.friends.includes(f)).length;
       return { ...getUserSafe(u), mutualFriends: mutual };
     }).sort((a, b) => b.mutualFriends - a.mutualFriends).slice(0, 10);
     return send(res, 200, suggestions);
+  }
+
+  const userFriendsMatch = pathname.match(/^\/api\/users\/(.+)\/friends$/);
+  if (userFriendsMatch && method === 'GET') {
+    const u = db.users.find(x => x.id === userFriendsMatch[1]);
+    if (!u) return send(res, 404, { message: 'Not found' });
+    const friends = u.friends.map(fid => db.users.find(x => x.id === fid)).filter(Boolean).map(getUserSafe);
+    return send(res, 200, friends);
   }
 
   const userProfileMatch = pathname.match(/^\/api\/users\/([^/]+)$/);

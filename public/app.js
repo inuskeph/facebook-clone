@@ -105,6 +105,16 @@ function attachHeaderEvents() {
   document.getElementById('avatarBtn')?.addEventListener('click', toggleUserMenu);
   document.getElementById('loginForm')?.addEventListener('submit', handleLogin);
   document.getElementById('showRegister')?.addEventListener('click', showRegisterForm);
+  // Load notification badge count
+  loadNotifBadge();
+}
+
+async function loadNotifBadge() {
+  try {
+    const data = await api('/api/notifications');
+    const badge = document.getElementById('notifBadge');
+    if (badge && data.unreadCount > 0) { badge.textContent = data.unreadCount; badge.style.display = 'flex'; }
+  } catch(e) {}
 }
 
 
@@ -419,6 +429,61 @@ async function loadProfile() {
   } catch(e) { document.getElementById('profileContainer').innerHTML = '<p style="text-align:center;padding:40px">Error loading profile</p>'; }
 }
 
+function showProfileTab(tab) {
+  document.querySelectorAll('.p-tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  const { profile, posts, friends } = window._profileData || {};
+  if (!profile) return;
+  const body = document.getElementById('profileBody');
+  const isOwner = profile.id === state.user.id;
+
+  if (tab === 'posts') {
+    body.innerHTML = `<div class="profile-sidebar">
+      <div class="intro-box"><h3>Intro</h3>
+        ${profile.bio?`<p style="text-align:center;margin-bottom:12px;color:var(--text2)">${escapeHtml(profile.bio)}</p>`:''}
+        ${profile.workplace?`<p class="intro-item">💼 Works at <strong>${escapeHtml(profile.workplace)}</strong></p>`:''}
+        ${profile.education?`<p class="intro-item">🎓 Studied at <strong>${escapeHtml(profile.education)}</strong></p>`:''}
+        ${profile.location?`<p class="intro-item">📍 Lives in <strong>${escapeHtml(profile.location)}</strong></p>`:''}
+        ${profile.relationship?`<p class="intro-item">❤️ ${escapeHtml(profile.relationship)}</p>`:''}
+      </div>
+      <div class="intro-box"><h3>Friends · ${friends.length}</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
+          ${friends.slice(0,9).map(f=>`<div onclick="navigate('profile',{userId:'${f.id}'})" style="cursor:pointer;text-align:center"><img src="${f.profilePicture}" style="width:100%;height:80px;object-fit:cover;border-radius:8px"><p style="font-size:12px;font-weight:500;margin-top:4px">${f.firstName}</p></div>`).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="profile-main">
+      ${isOwner?`<div class="create-post"><div class="create-post-top"><img src="${state.user.profilePicture}"><button onclick="openCreatePost()">What's on your mind?</button></div></div>`:''}
+      ${posts.map(renderPostCard).join('')}
+      ${posts.length===0?'<p style="text-align:center;padding:40px;color:var(--text2)">No posts yet</p>':''}
+    </div>`;
+  } else if (tab === 'about') {
+    body.innerHTML = `<div style="flex:1;background:var(--white);border-radius:8px;padding:24px;box-shadow:var(--shadow)">
+      <h3 style="margin-bottom:16px">About</h3>
+      <div style="display:grid;gap:16px">
+        <div><strong>Bio:</strong> ${profile.bio || 'Not set'}</div>
+        <div><strong>Workplace:</strong> ${profile.workplace || 'Not set'}</div>
+        <div><strong>Education:</strong> ${profile.education || 'Not set'}</div>
+        <div><strong>Location:</strong> ${profile.location || 'Not set'}</div>
+        <div><strong>Relationship:</strong> ${profile.relationship || 'Not set'}</div>
+        <div><strong>Website:</strong> ${profile.website || 'Not set'}</div>
+        <div><strong>Joined:</strong> ${new Date(profile.createdAt).toLocaleDateString()}</div>
+      </div>
+    </div>`;
+  } else if (tab === 'friends') {
+    body.innerHTML = `<div style="flex:1"><div class="grid">${friends.map(f => `<div class="card" onclick="navigate('profile',{userId:'${f.id}'})"><img class="card-img" src="${f.profilePicture}"><div class="card-body"><h4>${f.firstName} ${f.lastName}</h4><p>${f.location||''}</p></div></div>`).join('')}</div></div>`;
+  } else if (tab === 'photos') {
+    const photos = posts.filter(p => p.images?.length > 0).flatMap(p => p.images);
+    body.innerHTML = `<div style="flex:1;background:var(--white);border-radius:8px;padding:24px;box-shadow:var(--shadow)">
+      <h3 style="margin-bottom:16px">Photos</h3>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        ${photos.map(img => `<img src="${img}" style="width:100%;height:200px;object-fit:cover;border-radius:8px">`).join('')}
+        ${photos.length===0?'<p style="color:var(--text2)">No photos yet</p>':''}
+      </div>
+    </div>`;
+  }
+}
+
 function openEditProfile() {
   const p = window._profileData?.profile || state.user;
   const overlay = document.createElement('div');
@@ -511,6 +576,10 @@ async function loadMessenger() {
 async function openConversation(convId) {
   window._activeConv = convId;
   document.querySelectorAll('.conv-item').forEach(el => el.classList.remove('active'));
+  // Find and activate the clicked conversation
+  document.querySelectorAll('.conv-item').forEach(el => {
+    if (el.getAttribute('onclick')?.includes(convId)) el.classList.add('active');
+  });
   try {
     const data = await api(`/api/messages/conversations/${convId}`);
     const main = document.getElementById('msgMain');
@@ -672,8 +741,9 @@ async function filterMarketplace() {
   if (category) params.set('category', category);
   try {
     const data = await api(`/api/marketplace?${params.toString()}`);
-    document.getElementById('mpGrid').innerHTML = data.map(item => `
-      <div class="mp-item" onclick="openItemDetail(${JSON.stringify(item).replace(/"/g,'&quot;')})">
+    window._mpItems = data;
+    document.getElementById('mpGrid').innerHTML = data.map((item, idx) => `
+      <div class="mp-item" onclick="openItemDetailByIndex(${idx})">
         <img src="${item.images?.[0] || 'https://picsum.photos/400/300'}">
         <div class="mp-item-info">
           <div class="price">$${item.price.toLocaleString()}</div>
@@ -682,6 +752,12 @@ async function filterMarketplace() {
         </div>
       </div>`).join('');
   } catch(e) {}
+}
+
+function openItemDetailByIndex(idx) {
+  const item = window._mpItems[idx];
+  if (!item) return;
+  openItemDetail(item);
 }
 
 function openItemDetail(item) {
