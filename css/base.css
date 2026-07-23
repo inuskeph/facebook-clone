@@ -1,0 +1,42 @@
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--primary:#1877f2;--primary-hover:#166fe5;--green:#42b72a;--green-hover:#36a420;--red:#e41e3f;--bg:#f0f2f5;--white:#ffffff;--text:#050505;--text-secondary:#65676b;--border:#e4e6eb;--hover:#f2f2f2;--shadow:0 1px 2px rgba(0,0,0,.1);--shadow-lg:0 2px 12px rgba(0,0,0,.15);--radius:8px;--header-h:56px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.34;-webkit-font-smoothing:antialiased}
+a{color:var(--primary);text-decoration:none}
+button{cursor:pointer;border:none;outline:none;font-family:inherit}
+input,textarea,select{font-family:inherit;outline:none;border:none}
+img{max-width:100%;display:block}
+::-webkit-scrollbar{width:8px}
+::-webkit-scrollbar-thumb{background:#bcc0c4;border-radius:4px}
+
+/* Config error page */
+.config-error{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;gap:12px}
+.config-error h1{font-size:32px;color:var(--primary)}
+.config-error p{font-size:16px;color:var(--text-secondary)}
+.config-error code,.config-error pre{background:var(--border);padding:4px 12px;border-radius:6px;font-size:14px}
+.config-error pre{text-align:left;padding:16px}
+
+/* Toast */
+#toast-container{position:fixed;top:70px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+.toast{padding:12px 20px;border-radius:8px;color:white;font-weight:500;font-size:14px;opacity:0;transform:translateX(100%);transition:all .3s}
+.toast.show{opacity:1;transform:translateX(0)}
+.toast-info{background:var(--primary)}
+.toast-success{background:var(--green)}
+.toast-error{background:var(--red)}
+
+/* Buttons */
+.btn{padding:8px 16px;border-radius:6px;font-size:14px;font-weight:600;transition:all .2s;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn-primary{background:var(--primary);color:white}
+.btn-primary:hover{background:var(--primary-hover)}
+.btn-secondary{background:var(--border);color:var(--text)}
+.btn-secondary:hover{background:#d8dadf}
+.btn-green{background:var(--green);color:white}
+.btn-green:hover{background:var(--green-hover)}
+.btn-danger{background:var(--red);color:white}
+.btn-block{width:100%}
+.btn-lg{padding:12px 20px;font-size:16px}
+
+/* Form */
+.form-input{padding:12px;border:1px solid var(--border);border-radius:6px;font-size:14px;width:100%;transition:border-color .2s}
+.form-input:focus{border-color:var(--primary);box-shadow:0 0 0 2px rgba(24,119,242,.15)}
+.form-group{margin-bottom:12px}
+.form-label{display:block;font-size:13px;font-weight:600;margin-bottom:4px;color:var(--text-secondary)}

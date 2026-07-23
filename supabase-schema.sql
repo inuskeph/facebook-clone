@@ -1,13 +1,13 @@
 -- ============================================================
--- FACEBOOK CLONE - Supabase Database Schema
--- Run this in the Supabase SQL Editor (Dashboard > SQL Editor)
+-- SocialVerse - Complete Supabase Schema
+-- Run this ENTIRE file in SQL Editor (Dashboard > SQL Editor)
 -- ============================================================
 
--- 1. PROFILES
+-- PROFILES
 create table if not exists profiles (
   id uuid primary key references auth.users(id) on delete cascade,
-  first_name text not null,
-  last_name text not null,
+  first_name text not null default 'New',
+  last_name text not null default 'User',
   email text,
   avatar_url text,
   cover_url text,
@@ -20,19 +20,20 @@ create table if not exists profiles (
   created_at timestamptz default now()
 );
 
--- 2. POSTS
+-- POSTS (image_url for single image upload)
 create table if not exists posts (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references profiles(id) on delete cascade not null,
-  content text not null,
+  content text default '',
+  image_url text,
   images text[] default '{}',
-  privacy text default 'public' check (privacy in ('public','friends','private')),
+  privacy text default 'public',
   feeling text default '',
   location text default '',
   created_at timestamptz default now()
 );
 
--- 3. LIKES
+-- LIKES
 create table if not exists likes (
   id uuid primary key default gen_random_uuid(),
   post_id uuid references posts(id) on delete cascade not null,
@@ -41,7 +42,18 @@ create table if not exists likes (
   unique(post_id, user_id)
 );
 
--- 4. COMMENTS
+-- REACTIONS (emoji reactions)
+create table if not exists reactions (
+  id uuid primary key default gen_random_uuid(),
+  post_id uuid references posts(id) on delete cascade not null,
+  user_id uuid references profiles(id) on delete cascade not null,
+  type text not null default 'like',
+  created_at timestamptz default now(),
+  unique(post_id, user_id)
+);
+
+
+-- COMMENTS
 create table if not exists comments (
   id uuid primary key default gen_random_uuid(),
   post_id uuid references posts(id) on delete cascade not null,
@@ -50,17 +62,17 @@ create table if not exists comments (
   created_at timestamptz default now()
 );
 
--- 5. FRIENDS
+-- FRIENDS
 create table if not exists friends (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references profiles(id) on delete cascade not null,
   friend_id uuid references profiles(id) on delete cascade not null,
-  status text default 'pending' check (status in ('pending','accepted','declined')),
-  created_at timestamptz default now()
+  status text default 'pending',
+  created_at timestamptz default now(),
+  unique(user_id, friend_id)
 );
 
-
--- 6. CONVERSATIONS
+-- CONVERSATIONS
 create table if not exists conversations (
   id uuid primary key default gen_random_uuid(),
   user1_id uuid references profiles(id) on delete cascade not null,
@@ -70,7 +82,7 @@ create table if not exists conversations (
   created_at timestamptz default now()
 );
 
--- 7. MESSAGES
+-- MESSAGES
 create table if not exists messages (
   id uuid primary key default gen_random_uuid(),
   conversation_id uuid references conversations(id) on delete cascade not null,
@@ -80,52 +92,61 @@ create table if not exists messages (
   created_at timestamptz default now()
 );
 
--- 8. NOTIFICATIONS
+-- NOTIFICATIONS
 create table if not exists notifications (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references profiles(id) on delete cascade not null,
   from_user_id uuid references profiles(id) on delete cascade,
-  type text not null,
+  type text not null default 'general',
   content text not null,
   read boolean default false,
+  reference_id uuid,
   post_id uuid references posts(id) on delete set null,
   created_at timestamptz default now()
 );
 
--- 9. STORIES
+-- STORIES
 create table if not exists stories (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references profiles(id) on delete cascade not null,
-  type text default 'text' check (type in ('text','image')),
   content text default '',
-  media_url text default '',
+  image_url text,
   bg_color text default '#1877f2',
   expires_at timestamptz not null,
   created_at timestamptz default now()
 );
 
--- 10. GROUPS
+-- STORY VIEWS
+create table if not exists story_views (
+  id uuid primary key default gen_random_uuid(),
+  story_id uuid references stories(id) on delete cascade not null,
+  user_id uuid references profiles(id) on delete cascade not null,
+  viewed_at timestamptz default now(),
+  unique(story_id, user_id)
+);
+
+-- GROUPS
 create table if not exists groups (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   description text default '',
   cover_url text default '',
-  privacy text default 'public' check (privacy in ('public','private')),
+  privacy text default 'public',
   created_by uuid references profiles(id) on delete set null,
   created_at timestamptz default now()
 );
 
--- 11. GROUP MEMBERS
+-- GROUP MEMBERS
 create table if not exists group_members (
   id uuid primary key default gen_random_uuid(),
   group_id uuid references groups(id) on delete cascade not null,
   user_id uuid references profiles(id) on delete cascade not null,
-  role text default 'member' check (role in ('admin','moderator','member')),
+  role text default 'member',
   joined_at timestamptz default now(),
   unique(group_id, user_id)
 );
 
--- 12. PAGES
+-- PAGES
 create table if not exists pages (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -137,7 +158,7 @@ create table if not exists pages (
   created_at timestamptz default now()
 );
 
--- 13. PAGE LIKES
+-- PAGE LIKES
 create table if not exists page_likes (
   id uuid primary key default gen_random_uuid(),
   page_id uuid references pages(id) on delete cascade not null,
@@ -146,122 +167,117 @@ create table if not exists page_likes (
   unique(page_id, user_id)
 );
 
--- 14. MARKETPLACE ITEMS
+-- MARKETPLACE ITEMS
 create table if not exists marketplace_items (
   id uuid primary key default gen_random_uuid(),
   seller_id uuid references profiles(id) on delete cascade not null,
   title text not null,
   description text default '',
   price numeric default 0,
-  category text default 'Other',
+  category text default 'other',
   condition text default 'Good',
   location text default '',
-  image_url text default '',
-  status text default 'available' check (status in ('available','sold','removed')),
+  image_url text,
+  status text default 'available',
   created_at timestamptz default now()
 );
 
 
 -- ============================================================
--- ROW LEVEL SECURITY (RLS) POLICIES
+-- ENABLE ROW LEVEL SECURITY
 -- ============================================================
-
--- Enable RLS on all tables
 alter table profiles enable row level security;
 alter table posts enable row level security;
 alter table likes enable row level security;
+alter table reactions enable row level security;
 alter table comments enable row level security;
 alter table friends enable row level security;
 alter table conversations enable row level security;
 alter table messages enable row level security;
 alter table notifications enable row level security;
 alter table stories enable row level security;
+alter table story_views enable row level security;
 alter table groups enable row level security;
 alter table group_members enable row level security;
 alter table pages enable row level security;
 alter table page_likes enable row level security;
 alter table marketplace_items enable row level security;
 
--- PROFILES: anyone can read, users can update their own
-create policy "Profiles are viewable by everyone" on profiles for select using (true);
-create policy "Users can insert own profile" on profiles for insert with check (true);
-create policy "Users can update own profile" on profiles for update using (auth.uid() = id);
+-- ============================================================
+-- RLS POLICIES
+-- ============================================================
+create policy "profiles_select" on profiles for select using (true);
+create policy "profiles_insert" on profiles for insert with check (true);
+create policy "profiles_update" on profiles for update using (auth.uid() = id);
 
--- POSTS: public posts visible to all, users can CRUD their own
-create policy "Posts are viewable by everyone" on posts for select using (true);
-create policy "Users can create posts" on posts for insert with check (auth.uid() = user_id);
-create policy "Users can update own posts" on posts for update using (auth.uid() = user_id);
-create policy "Users can delete own posts" on posts for delete using (auth.uid() = user_id);
+create policy "posts_select" on posts for select using (true);
+create policy "posts_insert" on posts for insert with check (auth.uid() = user_id);
+create policy "posts_update" on posts for update using (auth.uid() = user_id);
+create policy "posts_delete" on posts for delete using (auth.uid() = user_id);
 
--- LIKES: anyone can read, authenticated users can like
-create policy "Likes are viewable" on likes for select using (true);
-create policy "Users can like" on likes for insert with check (auth.uid() = user_id);
-create policy "Users can unlike" on likes for delete using (auth.uid() = user_id);
+create policy "likes_select" on likes for select using (true);
+create policy "likes_insert" on likes for insert with check (auth.uid() = user_id);
+create policy "likes_delete" on likes for delete using (auth.uid() = user_id);
 
--- COMMENTS: anyone can read, authenticated users can comment
-create policy "Comments are viewable" on comments for select using (true);
-create policy "Users can comment" on comments for insert with check (auth.uid() = user_id);
-create policy "Users can delete own comments" on comments for delete using (auth.uid() = user_id);
+create policy "reactions_select" on reactions for select using (true);
+create policy "reactions_insert" on reactions for insert with check (auth.uid() = user_id);
+create policy "reactions_update" on reactions for update using (auth.uid() = user_id);
+create policy "reactions_delete" on reactions for delete using (auth.uid() = user_id);
 
--- FRIENDS: users can see their own friendships
-create policy "Users can view friendships" on friends for select using (auth.uid() = user_id or auth.uid() = friend_id);
-create policy "Users can send requests" on friends for insert with check (auth.uid() = user_id);
-create policy "Users can update requests sent to them" on friends for update using (auth.uid() = friend_id);
-create policy "Users can delete friendships" on friends for delete using (auth.uid() = user_id or auth.uid() = friend_id);
+create policy "comments_select" on comments for select using (true);
+create policy "comments_insert" on comments for insert with check (auth.uid() = user_id);
+create policy "comments_delete" on comments for delete using (auth.uid() = user_id);
 
--- CONVERSATIONS: participants can see their convos
-create policy "Users can view own conversations" on conversations for select using (auth.uid() = user1_id or auth.uid() = user2_id);
-create policy "Users can create conversations" on conversations for insert with check (auth.uid() = user1_id or auth.uid() = user2_id);
-create policy "Users can update own conversations" on conversations for update using (auth.uid() = user1_id or auth.uid() = user2_id);
+create policy "friends_select" on friends for select using (auth.uid() = user_id or auth.uid() = friend_id);
+create policy "friends_insert" on friends for insert with check (auth.uid() = user_id);
+create policy "friends_update" on friends for update using (auth.uid() = friend_id or auth.uid() = user_id);
+create policy "friends_delete" on friends for delete using (auth.uid() = user_id or auth.uid() = friend_id);
 
--- MESSAGES: conversation participants can read
-create policy "Users can view messages in their convos" on messages for select using (
+create policy "conversations_select" on conversations for select using (auth.uid() = user1_id or auth.uid() = user2_id);
+create policy "conversations_insert" on conversations for insert with check (auth.uid() = user1_id or auth.uid() = user2_id);
+create policy "conversations_update" on conversations for update using (auth.uid() = user1_id or auth.uid() = user2_id);
+
+create policy "messages_select" on messages for select using (
   exists (select 1 from conversations c where c.id = messages.conversation_id and (c.user1_id = auth.uid() or c.user2_id = auth.uid()))
 );
-create policy "Users can send messages" on messages for insert with check (auth.uid() = sender_id);
+create policy "messages_insert" on messages for insert with check (auth.uid() = sender_id);
 
--- NOTIFICATIONS: users see their own
-create policy "Users can view own notifications" on notifications for select using (auth.uid() = user_id);
-create policy "Users can create notifications" on notifications for insert with check (true);
-create policy "Users can update own notifications" on notifications for update using (auth.uid() = user_id);
+create policy "notifications_select" on notifications for select using (auth.uid() = user_id);
+create policy "notifications_insert" on notifications for insert with check (true);
+create policy "notifications_update" on notifications for update using (auth.uid() = user_id);
 
--- STORIES: visible to all
-create policy "Stories are viewable" on stories for select using (true);
-create policy "Users can create stories" on stories for insert with check (auth.uid() = user_id);
-create policy "Users can delete own stories" on stories for delete using (auth.uid() = user_id);
+create policy "stories_select" on stories for select using (true);
+create policy "stories_insert" on stories for insert with check (auth.uid() = user_id);
+create policy "stories_delete" on stories for delete using (auth.uid() = user_id);
 
--- GROUPS: visible to all
-create policy "Groups are viewable" on groups for select using (true);
-create policy "Users can create groups" on groups for insert with check (auth.uid() = created_by);
+create policy "story_views_select" on story_views for select using (true);
+create policy "story_views_insert" on story_views for insert with check (auth.uid() = user_id);
 
--- GROUP MEMBERS: visible to all
-create policy "Group members viewable" on group_members for select using (true);
-create policy "Users can join groups" on group_members for insert with check (auth.uid() = user_id);
-create policy "Users can leave groups" on group_members for delete using (auth.uid() = user_id);
+create policy "groups_select" on groups for select using (true);
+create policy "groups_insert" on groups for insert with check (auth.uid() = created_by);
 
--- PAGES: visible to all
-create policy "Pages are viewable" on pages for select using (true);
-create policy "Users can create pages" on pages for insert with check (auth.uid() = created_by);
+create policy "group_members_select" on group_members for select using (true);
+create policy "group_members_insert" on group_members for insert with check (auth.uid() = user_id);
+create policy "group_members_delete" on group_members for delete using (auth.uid() = user_id);
 
--- PAGE LIKES: visible to all
-create policy "Page likes viewable" on page_likes for select using (true);
-create policy "Users can like pages" on page_likes for insert with check (auth.uid() = user_id);
-create policy "Users can unlike pages" on page_likes for delete using (auth.uid() = user_id);
+create policy "pages_select" on pages for select using (true);
+create policy "pages_insert" on pages for insert with check (auth.uid() = created_by);
 
--- MARKETPLACE: visible to all
-create policy "Marketplace items viewable" on marketplace_items for select using (true);
-create policy "Users can create listings" on marketplace_items for insert with check (auth.uid() = seller_id);
-create policy "Users can update own listings" on marketplace_items for update using (auth.uid() = seller_id);
-create policy "Users can delete own listings" on marketplace_items for delete using (auth.uid() = seller_id);
+create policy "page_likes_select" on page_likes for select using (true);
+create policy "page_likes_insert" on page_likes for insert with check (auth.uid() = user_id);
+create policy "page_likes_delete" on page_likes for delete using (auth.uid() = user_id);
+
+create policy "marketplace_select" on marketplace_items for select using (true);
+create policy "marketplace_insert" on marketplace_items for insert with check (auth.uid() = seller_id);
+create policy "marketplace_update" on marketplace_items for update using (auth.uid() = seller_id);
+create policy "marketplace_delete" on marketplace_items for delete using (auth.uid() = seller_id);
+
 
 -- ============================================================
--- TRIGGER: Auto-create profile on signup
+-- AUTO-CREATE PROFILE ON SIGNUP
 -- ============================================================
 create or replace function public.handle_new_user()
-returns trigger
-language plpgsql
-security definer set search_path = public
-as $$
+returns trigger language plpgsql security definer set search_path = public as $$
 begin
   insert into public.profiles (id, first_name, last_name, email, avatar_url, cover_url)
   values (
@@ -269,7 +285,7 @@ begin
     coalesce(new.raw_user_meta_data->>'first_name', 'New'),
     coalesce(new.raw_user_meta_data->>'last_name', 'User'),
     new.email,
-    'https://i.pravatar.cc/150?img=' || floor(random() * 70)::text,
+    'https://ui-avatars.com/api/?name=' || coalesce(new.raw_user_meta_data->>'first_name', 'U') || '&background=1877f2&color=fff&size=150',
     'https://picsum.photos/seed/' || new.id::text || '/1200/400'
   );
   return new;
@@ -278,8 +294,51 @@ exception when others then
 end;
 $$;
 
--- Drop existing trigger if exists and create new
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- Create profile for any existing users without one
+insert into profiles (id, first_name, last_name, email, avatar_url, cover_url)
+select id,
+  coalesce(raw_user_meta_data->>'first_name', 'New'),
+  coalesce(raw_user_meta_data->>'last_name', 'User'),
+  email,
+  'https://ui-avatars.com/api/?name=' || coalesce(raw_user_meta_data->>'first_name', 'U') || '&background=1877f2&color=fff&size=150',
+  'https://picsum.photos/seed/' || id::text || '/1200/400'
+from auth.users
+where id not in (select id from profiles)
+on conflict (id) do nothing;
+
+-- ============================================================
+-- ENABLE REALTIME FOR MESSAGES (for live chat)
+-- ============================================================
+alter publication supabase_realtime add table messages;
+
+-- ============================================================
+-- STORAGE BUCKETS (run in SQL or create manually in Dashboard)
+-- Go to Storage in Dashboard and create these buckets:
+--   1. 'posts' - public bucket for post images
+--   2. 'avatars' - public bucket for profile pictures
+--   3. 'covers' - public bucket for cover photos
+--   4. 'stories' - public bucket for story images
+--   5. 'marketplace' - public bucket for marketplace item images
+--
+-- For each bucket, set the policy to allow authenticated uploads:
+--   - Allow uploads: (bucket_id = 'posts' AND auth.role() = 'authenticated')
+--   - Allow public reads: (bucket_id = 'posts')
+-- ============================================================
+
+-- Create storage buckets via SQL (may need to be done in Dashboard if this errors)
+insert into storage.buckets (id, name, public) values ('posts', 'posts', true) on conflict do nothing;
+insert into storage.buckets (id, name, public) values ('avatars', 'avatars', true) on conflict do nothing;
+insert into storage.buckets (id, name, public) values ('covers', 'covers', true) on conflict do nothing;
+insert into storage.buckets (id, name, public) values ('stories', 'stories', true) on conflict do nothing;
+insert into storage.buckets (id, name, public) values ('marketplace', 'marketplace', true) on conflict do nothing;
+
+-- Storage policies
+create policy "Public read" on storage.objects for select using (true);
+create policy "Auth upload" on storage.objects for insert with check (auth.role() = 'authenticated');
+create policy "Auth update own" on storage.objects for update using (auth.uid()::text = (storage.foldername(name))[1]);
+create policy "Auth delete own" on storage.objects for delete using (auth.uid()::text = (storage.foldername(name))[1]);
